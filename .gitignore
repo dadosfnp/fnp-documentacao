@@ -1,0 +1,29 @@
+# Variáveis de ambiente — NUNCA commitar
+.env
+.env.local
+.env.production
+
+# Credenciais Google
+credentials/
+*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
