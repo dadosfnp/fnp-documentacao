@@ -1,0 +1,39 @@
+# Variáveis de ambiente — NUNCA commitar
+.env
+.env.local
+.env.production
+
+# Conteúdo RAG / base de conhecimento — ainda não validado.
+# Mantido apenas localmente até a validação; não versionar por ora.
+/docs/equipe/
+/docs/tecnico/
+/docs/banco/
+/docs/sistemas/SISTEMA_FNP.md
+/scripts/
+/claude.md
+/CLAUDE.md
+
+# Credenciais Google
+credentials/
+*.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
