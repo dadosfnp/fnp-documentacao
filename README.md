@@ -35,6 +35,9 @@ fnp-documentacao/
 │   ├── python/          ← worker de ingestão e utilitários
 │   └── shell/           ← configuração de servidores
 │
+├── TIC/                 ← documentação e padrões globais de infraestrutura (TIC)
+│   └── playbook-deploy-novo-sistema.md  ← modelo replicável para subir qualquer sistema novo
+│
 ├── .env.example         ← modelo de variáveis de ambiente (sem valores reais)
 └── .gitignore           ← arquivos que nunca devem ser enviados ao repositório
 ```
@@ -51,6 +54,7 @@ fnp-documentacao/
 | Desenvolvedor entrando no projeto | [`docs/tecnico/ARQUITETURA.md`](docs/tecnico/ARQUITETURA.md) |
 | Precisa acessar o banco de dados | [`docs/banco/BANCO.md`](docs/banco/BANCO.md) |
 | Quer documentar um novo sistema | [`docs/sistemas/TEMPLATE_SISTEMA.md`](docs/sistemas/TEMPLATE_SISTEMA.md) |
+| Vai subir um novo sistema na infra (Droplet + Postgres) | [`TIC/playbook-deploy-novo-sistema.md`](TIC/playbook-deploy-novo-sistema.md) |
 
 ---
 
