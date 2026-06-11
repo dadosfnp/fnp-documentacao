@@ -8,7 +8,7 @@
 
 > 📌 Este guia é só para **dados tabulares** (planilhas/Parquet de indicadores, séries, bases que você trata no R).
 > Para **documentos comuns** — apresentações, atas, PDFs — o caminho é mais simples e está em
-> [`GUIA_ARQUIVOS.md`](GUIA_ARQUIVOS.md). Em dúvida sobre o desenho todo? → [`VISAO_GERAL_E_PROXIMOS_PASSOS.md`](VISAO_GERAL_E_PROXIMOS_PASSOS.md).
+> [`GUIA_DA_EQUIPE.md`](GUIA_DA_EQUIPE.md). Em dúvida sobre o desenho todo? → [`VISAO_GERAL_E_PROXIMOS_PASSOS.md`](VISAO_GERAL_E_PROXIMOS_PASSOS.md).
 
 ---
 

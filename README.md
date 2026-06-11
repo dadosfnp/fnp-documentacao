@@ -32,11 +32,10 @@ fnp-documentacao/
 │
 ├── docs/
 │   ├── equipe/                                ← guias para a equipe (linguagem acessível)
+│   │   ├── GUIA_DA_EQUIPE.md                  ← guia único: onde salvar, como nomear, como entregar dados (mandar à equipe)
 │   │   ├── VISAO_GERAL_E_PROXIMOS_PASSOS.md   ← apresentação: desenho da arquitetura + próximos passos
-│   │   ├── COMO_FUNCIONA_A_BASE_DE_CONHECIMENTO.md
-│   │   ├── GUIA_ARQUIVOS.md                   ← como nomear/organizar arquivos no Drive
-│   │   ├── ESTRUTURA_DRIVE.md                 ← estrutura oficial de pastas do Drive
-│   │   └── COMO_DOCUMENTAR_SEUS_DADOS.md      ← como o Núcleo mapeia dados tabulares
+│   │   ├── COMO_FUNCIONA_A_BASE_DE_CONHECIMENTO.md  ← o porquê (linguagem acessível)
+│   │   └── COMO_DOCUMENTAR_SEUS_DADOS.md      ← aprofundamento p/ o Núcleo (ficha de dados)
 │   ├── tecnico/
 │   │   ├── ARQUITETURA.md                     ← arquitetura do RAG (componentes, fluxos, RDAs)
 │   │   ├── FASES.md                           ← fonte única de status das fases do projeto

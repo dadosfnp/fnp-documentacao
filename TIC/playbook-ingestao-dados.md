@@ -44,7 +44,7 @@ Cada peça do dado mora no lugar onde ela é melhor servida:
 | **Arquivo Parquet** (pesado, binário) | **DO Spaces** (`dados/nucleo/...`) | Storage S3, certo pra blob grande; é a fonte arquivada |
 | **Dado consultável** (tabela) | Database **`nucleo_dados`** (ex.: `economia.pib_municipal`) | É onde se faz query/BI de verdade |
 
-> A **equipe só toca no Google Drive** (um lugar, familiar — segue os mesmos guias de [`docs/equipe/`](../docs/equipe/GUIA_ARQUIVOS.md)).
+> A **equipe só toca no Google Drive** (um lugar, familiar — segue o [`GUIA_DA_EQUIPE.md`](../docs/equipe/GUIA_DA_EQUIPE.md)).
 > Quem faz a parte híbrida (arquivar o Parquet no Spaces e carregar a tabela no banco) é a **TIC**.
 
 ---
@@ -113,7 +113,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE nucleo_carga IN SCHEMA economia GRANT SELECT O
   é para humano; o `.yaml` é para a máquina. Mantenha os dois em sincronia.
 
 ### Passo 3 — Entregar no Google Drive (Núcleo de Dados)
-Tudo num lugar só, na pasta de dados já monitorada (ver [`ESTRUTURA_DRIVE.md`](../docs/equipe/ESTRUTURA_DRIVE.md)):
+Tudo num lugar só, na pasta de dados já monitorada (ver [`GUIA_DA_EQUIPE.md`](../docs/equipe/GUIA_DA_EQUIPE.md)):
 
 ```
 📁 FNP — Base de Conhecimento/
