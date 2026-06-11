@@ -226,6 +226,10 @@ O que é importante deixar claro — e ser honesto sobre — para a equipe e par
 > Resumo honesto: **não navega na web e os dados ficam na nossa infra — exceto** o texto enviado às
 > APIs de IA (operadores). É isso que deve ir para a equipe, sem prometer "zero internet".
 
+**Rumo a zero-egress:** o plano para o dado realmente não sair (embeddings locais + modelo de resposta
+self-hosted) e os custos/requisitos de aquisição estão em [`RAG_SOBERANO.md`](RAG_SOBERANO.md). Visão
+geral das melhorias em [`ROADMAP_RAG_V2.md`](ROADMAP_RAG_V2.md).
+
 ---
 
 ## Variáveis de ambiente necessárias

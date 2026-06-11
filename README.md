@@ -40,7 +40,9 @@ fnp-documentacao/
 │   ├── tecnico/
 │   │   ├── ARQUITETURA.md                     ← arquitetura do RAG (componentes, fluxos, RDAs)
 │   │   ├── FASES.md                           ← fonte única de status das fases do projeto
-│   │   └── AVALIACAO_RAG.md                   ← método e gabarito para medir o RAG antes do "100%"
+│   │   ├── AVALIACAO_RAG.md                   ← método e gabarito para medir o RAG antes do "100%"
+│   │   ├── ROADMAP_RAG_V2.md                  ← plano futuro: melhorias de maior alavancagem
+│   │   └── RAG_SOBERANO.md                    ← plano futuro: zero-egress (local) + custos/aquisição
 │   ├── banco/
 │   │   └── BANCO.md                           ← schemas, roles e tabelas do PostgreSQL
 │   └── sistemas/
