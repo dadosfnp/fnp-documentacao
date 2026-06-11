@@ -135,8 +135,10 @@ Tudo isso sem precisar abrir um único arquivo manualmente.
 
 A equipe **não precisa aprender nenhuma ferramenta nova**. Só precisa:
 
-1. **Salvar arquivos nas pastas certas** do Google Drive (ver `ESTRUTURA_DRIVE.md`)
-2. **Nomear os arquivos seguindo o padrão** — data + assunto, sem espaços, sem acentos no nome (ver `GUIA_ARQUIVOS.md`)
+1. **Salvar arquivos nas pastas certas** do Google Drive
+2. **Nomear os arquivos seguindo o padrão** — data + assunto, sem espaços, sem acentos no nome
+
+Os dois passos, com exemplos e checklist, estão no [`GUIA_DA_EQUIPE.md`](GUIA_DA_EQUIPE.md).
 
 O Pedro cuida de tudo o mais: configuração do servidor, indexação automática, manutenção do sistema.
 

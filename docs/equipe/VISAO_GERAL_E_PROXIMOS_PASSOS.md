@@ -119,9 +119,8 @@ Por isso: **apresentação e PowerPoint nunca viram tabela no banco.** Só os da
 ## O que cada um precisa fazer agora
 
 ### 👥 Toda a equipe (documentos no Drive)
-**Não muda nada no seu dia a dia.** Você continua salvando no Drive. Só siga duas convenções simples:
-1. Salvar nas pastas certas → [`ESTRUTURA_DRIVE.md`](ESTRUTURA_DRIVE.md)
-2. Nomear os arquivos no padrão (data + assunto, sem espaço/acento) → [`GUIA_ARQUIVOS.md`](GUIA_ARQUIVOS.md)
+**Não muda nada no seu dia a dia.** Você continua salvando no Drive — só seguindo as convenções de
+pasta e nome do [`GUIA_DA_EQUIPE.md`](GUIA_DA_EQUIPE.md) (data + assunto, sem espaço/acento).
 
 Quer entender melhor *por que* isso importa? → [`COMO_FUNCIONA_A_BASE_DE_CONHECIMENTO.md`](COMO_FUNCIONA_A_BASE_DE_CONHECIMENTO.md)
 
