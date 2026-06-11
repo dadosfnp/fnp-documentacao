@@ -153,7 +153,7 @@ O RAG precisa saber **o que existe no Drive** (ex.: "esse relatório já foi col
 **não** é o RAG percorrer o Drive a cada pergunta — é manter um **catálogo no banco** que um worker sincroniza.
 
 - A tabela [`rag.arquivos_indexados`](../docs/banco/BANCO.md) **já é esse catálogo**: `caminho`, `hash_sha256`, `tipo`, `status`, `ultima_ingestao`.
-- Um **worker** lê o Drive (**cron diário + polling** — não webhook; o worker não tem IP público, ver RDA-003), calcula o **SHA-256** de cada arquivo e atualiza o catálogo.
+- Um **worker** lê o Drive (**cron diário + polling** — não webhook, que exigiria endpoint HTTPS público dedicado; ver RDA-003), calcula o **SHA-256** de cada arquivo e atualiza o catálogo.
 - O RAG, ao responder, **consulta o catálogo no banco** — rápido, com busca semântica sobre o conteúdo já indexado.
 
 **Por que não varrer o Drive ao vivo:** é lento, esbarra no *rate limit* da API do Google e — principalmente —

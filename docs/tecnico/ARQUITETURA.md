@@ -167,8 +167,8 @@ IP público para servir as apps via Nginx, mas o worker não precisa receber cha
 **Decisão:** o assistente tem **duas pernas**, escolhidas por um roteador antes de responder:
 - **Documento** ("o que foi decidido na ata X?") → busca semântica nos embeddings de `rag`.
 - **Dado** ("PIB dos 10 maiores municípios filiados?") → **text-to-SQL**: Claude gera a query a
-  partir do dicionário do dataset (tabela, colunas, grão, unidade), roda nos schemas do Núcleo
-  (com credencial de leitura) e responde com o resultado, citando a tabela.
+  partir do dicionário do dataset (tabela, colunas, grão, unidade), roda no `fnp_rag` sobre as
+  foreign tables (FDW read-only, RDA-008) e responde com o resultado, citando a tabela.
 
 **Motivo:** busca por similaridade de vetor **não responde** pergunta de ranking/soma/filtro — isso
 é SQL. Indexar uma base de 78 mil linhas como texto seria caro e inútil. O **dicionário que o Núcleo

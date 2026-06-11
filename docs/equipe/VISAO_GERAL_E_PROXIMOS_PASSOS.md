@@ -110,7 +110,7 @@ O **assistente (RAG)** é o que costura as três: ele sabe **onde** cada coisa e
 A diferença entre os dois tipos de material:
 
 - 📄 **Documento** você quer **encontrar** → fica no Drive, o assistente acha e aponta.
-- 📊 **Dado tabular** (PIB, indicadores) você quer **consultar/cruzar** → vira tabela num schema do Núcleo, no mesmo banco.
+- 📊 **Dado tabular** (PIB, indicadores) você quer **consultar/cruzar** → vira tabela no banco `nucleo_dados`; o assistente lê de lá.
 
 Por isso: **apresentação e PowerPoint nunca viram tabela no banco.** Só os dados tabulares do Núcleo.
 
