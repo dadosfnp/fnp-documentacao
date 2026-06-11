@@ -3,17 +3,11 @@
 .env.local
 .env.production
 
-# Conteúdo RAG / base de conhecimento — ainda não validado.
-# Mantido apenas localmente até a validação; não versionar por ora.
-/docs/equipe/
-/docs/tecnico/
-/docs/banco/
-/docs/sistemas/SISTEMA_FNP.md
-/scripts/
+# Instruções internas do Claude — mantidas fora do versionamento por ora
 /claude.md
 /CLAUDE.md
 
-# Credenciais Google
+# Credenciais Google e qualquer JSON de segredo (service account etc.)
 credentials/
 *.json
 
