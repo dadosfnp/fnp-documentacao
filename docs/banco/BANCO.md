@@ -157,7 +157,7 @@ import psycopg2
 conn = psycopg2.connect(
     host="db-xxx.db.ondigitalocean.com",
     port=25060,
-    dbname="defaultdb",
+    dbname="fnp_rag",
     user="readonly",
     password="SENHA",
     sslmode="require"

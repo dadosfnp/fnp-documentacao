@@ -6,7 +6,7 @@ extrai texto, gera embeddings e salva no PostgreSQL.
 Regra de ouro (ver ARQUITETURA.md, RDA-006):
     - DOCUMENTO (PDF, DOCX, PPTX, MD, TXT) você quer *encontrar* → vira embedding em rag.documentos.
     - DADO TABULAR (Parquet, Excel, CSV) você quer *consultar/cruzar* → NÃO é embedado aqui;
-      vai para um schema do Núcleo (economia/social/...) via playbook-ingestao-dados.md e é
+      vai para o database nucleo_dados (schema por tema) via playbook-ingestao-dados.md e é
       respondido por text-to-SQL. O que o RAG indexa do Núcleo é o `.dicionario.md` (o mapa),
       nunca o Parquet em si. Por isso formatos tabulares ficam fora de EXTENSOES_VALIDAS.
 
@@ -62,7 +62,7 @@ def get_conn():
     return psycopg2.connect(
         host=os.getenv("DB_HOST"),
         port=int(os.getenv("DB_PORT", 25060)),
-        dbname=os.getenv("DB_NAME", "defaultdb"),
+        dbname=os.getenv("DB_NAME", "fnp_rag"),
         user="ingestor",
         password=os.getenv("DB_PASS_INGESTOR"),
         sslmode=os.getenv("DB_SSL", "require"),
