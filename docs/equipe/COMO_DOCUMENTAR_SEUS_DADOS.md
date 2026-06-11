@@ -50,7 +50,7 @@ Se o dado só existe em **Excel**, tudo bem — mas siga as regras abaixo, senã
 
 ## Parte 2 — A ficha (dicionário)
 
-Para cada conjunto de dados, copie o modelo **`template-dicionario-dataset.md`** (o Pedro te passa)
+Para cada conjunto de dados, copie o modelo **`template-dicionario-dataset.md`**
 e preencha. Não precisa entender de banco — precisa explicar **o que você já sabe** sobre o dado.
 
 Abaixo, os 4 conceitos que mais confundem. Se você acertar esses, o resto é fácil.
