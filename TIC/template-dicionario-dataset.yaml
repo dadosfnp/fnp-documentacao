@@ -1,0 +1,88 @@
+# =============================================================
+# Dicionário de dataset — versão ESTRUTURADA (para o text-to-SQL)
+# =============================================================
+# Esta é a versão que o ROTEADOR do assistente lê de forma programática para
+# montar a query (ver RDA-006 em docs/tecnico/ARQUITETURA.md). O .md irmão
+# (template-dicionario-dataset.md) é a versão para humano — mantenha os dois
+# em sincronia. Copie este arquivo para <slug>_AAAA-MM-DD.dicionario.yaml.
+#
+# Os valores abaixo são EXEMPLO (PIB municipal); substitua tudo.
+
+dataset:
+  nome: "PIB municipal"
+  slug: "pib_municipal"                 # snake_case, sem acento
+  versao: "2026-06-11"                  # data de referência (não a do upload)
+  responsavel: "Fulano de Tal <fulano@fnp.org.br>"
+  equipe: "Núcleo de Dados"
+  periodicidade: "anual"                # anual | mensal | eventual
+
+localizacao:
+  banco: "banco único FNP"              # mesmo banco do rag (RDA-002)
+  schema: "economia"                    # schema do tema (não database separado)
+  tabela: "pib_municipal"               # schema.tabela = economia.pib_municipal
+  arquivo_spaces: "dados/nucleo/pib_municipal/pib_municipal_2026-06-11.parquet"
+  formato: "parquet"                    # parquet | excel
+
+grao:
+  descricao: "1 município por ano"      # o que 1 linha representa
+  periodo_coberto: "2010-2024"
+  abrangencia: "todos os 5.570 municípios"
+  linhas_aprox: 78000
+
+# Liste TODAS as colunas, na ordem do arquivo. chave: true nas que formam a PK.
+colunas:
+  - nome: "cod_municipio"
+    tipo: "inteiro"
+    unidade: "código IBGE 7 dígitos"
+    chave: true
+    descricao: "Identificador oficial do município"
+    exemplo: "3550308"
+  - nome: "ano"
+    tipo: "inteiro"
+    unidade: "AAAA"
+    chave: true
+    descricao: "Ano de referência"
+    exemplo: "2024"
+  - nome: "nome_municipio"
+    tipo: "texto"
+    unidade: null
+    chave: false
+    descricao: "Nome do município"
+    exemplo: "São Paulo"
+  - nome: "uf"
+    tipo: "texto"
+    unidade: "sigla 2 letras"
+    chave: false
+    descricao: "Unidade da federação"
+    exemplo: "SP"
+  - nome: "pib"
+    tipo: "decimal"
+    unidade: "R$ mil correntes"
+    chave: false
+    descricao: "PIB total do ano"
+    exemplo: "829840000"
+
+chave:
+  primaria: ["cod_municipio", "ano"]
+  estrategia_carga: "truncate_copy"     # truncate_copy (substituição total) | upsert
+
+origem:
+  fonte: "IBGE — SIDRA tabela 5938"
+  link: "https://sidra.ibge.gov.br/tabela/5938"
+  tratamento_r: "filtra anos < 2010, converte PIB para mil reais, padroniza UF"
+  script: "R/extrai_pib.R"
+
+# O que torna o roteador assertivo:
+roteamento:
+  tags: ["economia", "PIB", "município", "IBGE", "indicadores econômicos"]
+  responde:
+    - "Qual o PIB do município X em 2024?"
+    - "Quais os 10 municípios filiados de maior PIB?"
+    - "Como o PIB de X evoluiu nos últimos 10 anos?"
+  nao_responde:
+    - "PIB per capita (não está aqui — ver dataset populacao)"
+
+historico:
+  - versao: "2026-06-11"
+    mudanca: "primeira carga"
+    responsavel: "Fulano de Tal"

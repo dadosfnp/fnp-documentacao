@@ -138,9 +138,9 @@ Detalhes técnicos em [`TIC/playbook-ingestao-dados.md`](../../TIC/playbook-inge
 
 ## As fases até o RAG 100% funcional
 
-> 📌 **Fonte única de status:** esta é a **visão simplificada para a equipe**. O status técnico
-> detalhado (fase a fase, com critério de conclusão) é mantido **só** no `CLAUDE.md` do projeto —
-> é de lá que esta tabela é derivada. Se as duas divergirem, vale o `CLAUDE.md`.
+> 📌 **Fonte única de status:** esta é a **visão simplificada para a equipe**. O status canônico
+> (fase a fase, com critério de conclusão) vive em [`docs/tecnico/FASES.md`](../tecnico/FASES.md) —
+> é de lá que esta tabela é derivada. Se as duas divergirem, vale o `FASES.md`.
 
 > Legenda: ✅ concluído · 🔄 em andamento · ⏳ a fazer. *(O Pedro atualiza o status conforme avança.)*
 
