@@ -4,6 +4,11 @@
 > Ele acompanha o arquivo de dados na entrega (ver [`playbook-ingestao-dados.md`](playbook-ingestao-dados.md))
 > e é **a fonte que o RAG indexa** para saber que este dataset existe, onde está e o que ele responde.
 > Campo em branco = o RAG não sabe responder sobre aquilo. Preencha com capricho.
+>
+> 🤖 **Versão para a máquina:** existe um espelho estruturado deste dicionário em
+> [`template-dicionario-dataset.yaml`](template-dicionario-dataset.yaml). É o `.yaml` que o
+> **text-to-SQL** lê para montar a query (tabela, colunas, tipos, chave). Este `.md` é para humano;
+> o `.yaml`, para a máquina — os dois precisam ficar em sincronia.
 
 ---
 
