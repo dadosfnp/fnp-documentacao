@@ -13,7 +13,7 @@
 2. **Não tocar no que está em produção.** Sistema novo é greenfield: monte e valide em paralelo; só vire o tráfego no fim.
 3. **Privilégio mínimo.** Cada sistema tem credenciais próprias com o menor escopo possível.
 4. **Segredos nunca no git.** `.env` e bancos locais fora do versionamento; segredos em cofre.
-5. **Tudo versionado e reproduzível.** Imagem Docker, migrations, e documentação (ADR + runbook + dicionário).
+5. **Tudo versionado e reproduzível.** Artefato de build (imagem Docker **ou** `requirements.txt` + `entrypoint`), migrations, e documentação (ADR + runbook + dicionário).
 6. **Validar sem publicar.** Use túnel SSH para revisar antes de expor à internet.
 
 ---
@@ -27,8 +27,9 @@ Antes de escrever qualquer coisa, levante (e anote num runbook):
 - **Rede:** o IP do droplet está na allowlist do banco? (testes de DB rodam do droplet, não da máquina local).
 - **Padrões reais já implantados** (não os documentados): como os outros sistemas rodam, autenticam, servem estáticos.
 
-> ⚠️ Aprendizado: o doc pode dizer "Docker + schemas" enquanto a realidade é "systemd+venv + 1 database por sistema".
-> Decida sempre a partir do que existe.
+> ⚠️ Aprendizado: a doc diverge da realidade nas duas direções — já achamos doc dizendo "App Platform"
+> quando a realidade era Droplet, e "schema por sistema" quando o real é 1 database por sistema.
+> **Valide o ambiente real antes de planejar** (este reconhecimento corrigiu a arquitetura do RAG).
 
 ---
 
@@ -62,7 +63,11 @@ ALTER SCHEMA public OWNER TO <sys>_app;   -- garante que o migrate consiga criar
 
 ---
 
-## 4. Containerização (padrão Docker para todos)
+## 4. Containerização — Docker é o padrão (no Droplet `fnp-web`)
+
+> **Padrão da infra: Docker** (Compose + Nginx reverse-proxy no Droplet `fnp-web`). O IFEM foi o
+> piloto e já roda assim; sistemas novos nascem em Docker. O **Sistema FNP** ainda roda em
+> systemd+venv (legado, anterior à padronização) e deve migrar — é a **exceção atual**, não o modelo.
 
 Cada sistema entrega, no próprio repo:
 
@@ -144,7 +149,7 @@ ssh -L <porta>:localhost:<porta> root@<ip-do-droplet>
 ## 11. Checklist final (Definition of Done)
 
 - [ ] Database + role dedicados criados; conexão testada.
-- [ ] Imagem builda; container **healthy**; HTTP 200.
+- [ ] App sobe em Docker (container **healthy**) no `fnp-web`; HTTP 200 via Nginx. (FNP legado: serviço `systemd` ativo.)
 - [ ] Dados migrados e **contagens validadas**.
 - [ ] Segredos no cofre; nenhum segredo no git.
 - [ ] ADR + runbook + README + dicionário de dados atualizados.
@@ -158,6 +163,6 @@ ssh -L <porta>:localhost:<porta> root@<ip-do-droplet>
 - **Recon antes de decidir** — a documentação não é a realidade; valide o ambiente real primeiro.
 - **1 database + 1 role por sistema** — isolamento e privilégio mínimo.
 - **Segredos nunca no git** — sempre no cofre (Bitwarden), nunca em chat/log/commit.
-- **Docker padroniza todos** — mesma forma de buildar, rodar e servir em qualquer sistema.
+- **Docker é o padrão** — Compose + Nginx no Droplet `fnp-web`; IFEM piloto. FNP legado em systemd, a migrar.
 - **Valide por túnel antes de publicar** — revise via SSH antes de expor à internet.
 - **Documente os três eixos** — decisão (ADR) + execução (runbook) + schema (dicionário gerado).
