@@ -202,6 +202,32 @@ do `fnp_rag` (cópia analítica) se a leitura via FDW se mostrar lenta — come�
 
 ---
 
+## Privacidade e fronteira de dados (LGPD)
+
+O que é importante deixar claro — e ser honesto sobre — para a equipe e para a LGPD:
+
+**Fica dentro da infra da FNP:**
+- O assistente **não navega na internet** — responde **só** do acervo interno (Drive indexado +
+  bancos da FNP). Não há busca na web.
+- Documentos e dados ficam no DigitalOcean (Drive/Spaces + Postgres Managed). O **banco não é
+  exposto** à internet; o acesso é só pela API autenticada (RDA-005).
+- **Controle de acesso por documento** (`nivel_acesso`, RDA-007): conteúdo restrito não aparece
+  para quem não pode.
+- O RAG lê os outros bancos **só-leitura** (FDW) — não altera dado de ninguém.
+
+**O que sai da FNP (e precisa ser tratado como operador de dados):**
+- Para gerar **embeddings** e **respostas**, trechos de texto são enviados por HTTPS às APIs da
+  **OpenAI** (embeddings) e da **Anthropic** (Claude). Elas são **operadores** de dados pessoais —
+  exige base legal, contrato/DPA e, idealmente, evitar enviar PII.
+- **Pendências de LGPD a resolver antes de indexar material sensível:** (a) detectar/mascarar PII
+  no conteúdo antes de embedar (TODO no `ingestor.py`, RDA-007); (b) formalizar o tratamento com
+  OpenAI/Anthropic. Alternativa a estudar: embedding local (sem sair da FNP).
+
+> Resumo honesto: **não navega na web e os dados ficam na nossa infra — exceto** o texto enviado às
+> APIs de IA (operadores). É isso que deve ir para a equipe, sem prometer "zero internet".
+
+---
+
 ## Variáveis de ambiente necessárias
 
 Ver `.env.example` na raiz do repositório.
