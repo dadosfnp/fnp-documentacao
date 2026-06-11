@@ -26,8 +26,8 @@ O Sistema FNP é o sistema central de gestão da instituição. Ele centraliza:
 
 | Ambiente | Detalhe |
 |----------|---------|
-| Produção | DigitalOcean App Platform |
-| Banco de dados | DO Managed PostgreSQL 16 |
+| Produção | Droplet DigitalOcean `fnp-web` (Nginx + gunicorn) |
+| Banco de dados | DO Managed PostgreSQL — database `fnp_sistema` |
 | Domínio | `sistema.fnp.org.br` |
 | Repositório | GitHub privado FNP |
 
@@ -174,7 +174,7 @@ pode_ver(user, obj)
 
 ### O que nunca fazer
 
-- Nunca usar Docker — desenvolvimento 100% local, deploy gerenciado
+- Deploy hoje em systemd + venv + gunicorn + Nginx no Droplet (sem Docker ainda); a infra está padronizando Docker (IFEM já dockerizado) e o FNP deve migrar — ver `TIC/playbook-deploy-novo-sistema.md`
 - Nunca instalar Celery ou Redis — tarefas são síncronas; jobs periódicos via Cron do DO
 - Nunca usar chave primária sequencial — sempre UUID via `ModeloBase`
 - Nunca commitar o arquivo `.env`
@@ -242,6 +242,6 @@ R: Na pasta `documentacao/` do repositório do sistema: `autenticacao-setup.md`,
 
 | Data | Mudança |
 |------|---------|
-| 2025 | Migração para DigitalOcean (App Platform + Managed Postgres) |
+| 2025 | Migração para DigitalOcean (Droplet `fnp-web` + Managed Postgres) |
 | 2025 | Implementação LGPD nível 2 (OAuth + 2FA + ACL por objeto + auditoria de leitura) |
 | 2025 | Aplicação `presenca` unificada com GenericForeignKey |

@@ -8,36 +8,42 @@ _Última atualização: 2026-06-11._
 
 ---
 
-## Sistemas
+## Infra base
 
-| Sistema | Runtime | Porta interna | Database | Domínio | LGPD | Status |
+| Recurso | Detalhe |
+|---|---|
+| Servidor | **Droplet `fnp-web`** (DO, Ubuntu) — Nginx (TLS) na frente; **upgrade previsto** (swap 2G → RAM 4GB quando o RAG entrar) |
+| Banco | **PostgreSQL Managed** (DO), porta 25060, SSL — **upgrade a estudar** |
+| Runtime padrão | **Docker** (Compose + Nginx reverse-proxy). FNP ainda em systemd+venv (legado, a migrar) |
+
+## Sistemas (1 database por sistema)
+
+| Sistema | Runtime | Porta | Database | Domínio | LGPD | Status |
 |---|---|---|---|---|---|---|
-| **Sistema FNP** (CRM) | App Platform / systemd+venv (sem Docker) | 8001 | `fnp` | `sistema.fnp.org.br` | nível 2 | produção |
-| **RAG** (Base de Conhecimento) | Django (API) + Droplet worker `systemd`+cron | 8002 | banco único (schemas abaixo) | a definir | herda RDA-007 | em construção |
-| **IFEM** | a definir | 8003 | `ifem` (database próprio) | a definir | a definir | futuro |
-| _(próximos)_ | | 8004+ | 1 sistema = 1 database | | | |
+| **Sistema FNP** (CRM) | systemd+venv no `fnp-web` (migrando p/ Docker) | 8001 | `fnp_sistema` | `sistema.fnp.org.br` | nível 2 | produção |
+| **IFEM** (Subfinanciados) | Docker no `fnp-web` | 8003 | `ifem` | a publicar | a definir | no ar (túnel SSH) |
+| **RAG** (Base de Conhecimento) | Docker no `fnp-web` + worker cron | 8002 | `fnp_rag` (+ FDW p/ os outros) | a definir | herda RDA-007 | em construção |
+| _(próximos)_ | Docker no `fnp-web` | 8004+ | 1 sistema = 1 database | | | |
 
-> Convenção de portas (ver [`playbook-deploy-novo-sistema.md`](playbook-deploy-novo-sistema.md)):
-> FNP=8001, RAG=8002, IFEM=8003, próximos=8004+.
+> Portas: FNP=8001, RAG=8002, IFEM=8003, próximos=8004+.
 
 ---
 
-## Banco PostgreSQL (DO Managed) — banco único
+## Bancos PostgreSQL (DO Managed — 1 db por sistema)
 
-| Schema | Conteúdo | Quem escreve | Quem lê |
+| Database | Conteúdo | Escreve | Lê |
 |---|---|---|---|
-| `rag` | embeddings, catálogo, histórico de perguntas | `ingestor` | `app_write`, `readonly` |
-| `app` | dados do Sistema FNP espelhados/integrados | `app_write` | `readonly` |
-| `admin` | usuários do chat, audit log | `dba_admin` / `app_write` | — |
-| `economia` | datasets do Núcleo (tema economia) | `nucleo_carga` | `app_write`, `readonly` |
-| `social` | datasets do Núcleo (tema social) | `nucleo_carga` | `app_write`, `readonly` |
-| `eleitoral` | datasets do Núcleo (tema eleitoral) | `nucleo_carga` | `app_write`, `readonly` |
+| `fnp_sistema` | CRM (municípios, pessoas, eventos…) | FNP (`admin_sistema`) | `fnp_ro` (FDW do RAG) |
+| `ifem` | dados do IFEM/Subfinanciados | IFEM (`ifem_app`) | `ifem_ro` (FDW do RAG) |
+| `nucleo_dados` | datasets do Núcleo (schemas `economia`, `social`…) | `nucleo_carga` | `nucleo_ro` (FDW do RAG) |
+| `fnp_rag` | RAG: `rag` (embeddings/catálogo) + `admin` | `ingestor`, `app_write` | `readonly` |
 
-> Regra (RDA-002): dado tabular consultável = **schema** aqui; app com ORM próprio = **database** dedicado.
+> Regra (RDA-002): app/sistema/Núcleo = **database próprio**; o `fnp_rag` lê os demais por
+> **`postgres_fdw`** read-only (RDA-008), sem copiar dado.
 
 ---
 
-## Datasets do Núcleo de Dados
+## Datasets do Núcleo de Dados (database `nucleo_dados`)
 
 | Dataset | Schema.tabela | Dono | Última versão | Dicionário | Status |
 |---|---|---|---|---|---|

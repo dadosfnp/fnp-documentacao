@@ -20,8 +20,8 @@
 | Repositório | `github.com/fnp/nome-do-repo` |
 | Ambiente de produção | URL ou descrição |
 | Tecnologia principal | Django / React / etc. |
-| Banco de dados | schema `app` no PostgreSQL DO |
-| Deploy | DigitalOcean App Platform / Droplet |
+| Banco de dados | database próprio no PostgreSQL DO (ex.: `nome_sistema`) |
+| Deploy | Droplet `fnp-web` + Docker (Compose + Nginx) |
 
 ---
 
@@ -37,7 +37,7 @@ Liste as funcionalidades principais em tópicos curtos:
 
 ## Estrutura do banco (tabelas principais)
 
-Liste as tabelas que este sistema usa no schema `app`:
+Liste as tabelas que este sistema usa no seu database próprio (schema `public`):
 
 | Tabela | Descrição |
 |--------|-----------|
