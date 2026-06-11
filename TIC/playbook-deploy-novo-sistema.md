@@ -13,7 +13,7 @@
 2. **Não tocar no que está em produção.** Sistema novo é greenfield: monte e valide em paralelo; só vire o tráfego no fim.
 3. **Privilégio mínimo.** Cada sistema tem credenciais próprias com o menor escopo possível.
 4. **Segredos nunca no git.** `.env` e bancos locais fora do versionamento; segredos em cofre.
-5. **Tudo versionado e reproduzível.** Imagem Docker, migrations, e documentação (ADR + runbook + dicionário).
+5. **Tudo versionado e reproduzível.** Artefato de build (imagem Docker **ou** `requirements.txt` + `entrypoint`), migrations, e documentação (ADR + runbook + dicionário).
 6. **Validar sem publicar.** Use túnel SSH para revisar antes de expor à internet.
 
 ---
@@ -62,9 +62,17 @@ ALTER SCHEMA public OWNER TO <sys>_app;   -- garante que o migrate consiga criar
 
 ---
 
-## 4. Containerização (padrão Docker para todos)
+## 4. Runtime — Docker **ou** App Platform/systemd (escolha consciente)
 
-Cada sistema entrega, no próprio repo:
+> ⚠️ **Não há "Docker para todos".** Dois runtimes convivem na FNP, e a escolha é por sistema:
+> - **App Platform / systemd + venv** — é o caso do **Sistema FNP** (deploy gerenciado no DO App
+>   Platform; ver [`SISTEMA_FNP.md`](../docs/sistemas/SISTEMA_FNP.md), "nunca usar Docker") e do
+>   **worker de ingestão do RAG** (Droplet com `systemd` + cron, sem container).
+> - **Docker** — para sistemas novos onde a portabilidade de imagem compensa.
+>
+> Decida no pré-flight (seção 1) e registre no ADR. O resto desta seção vale **se** você escolheu Docker.
+
+Cada sistema **Dockerizado** entrega, no próprio repo:
 
 - **`Dockerfile`** — base slim, **usuário não-root**, deps via `requirements.txt` (cache de layer), `EXPOSE` da porta interna.
 - **`entrypoint.sh`** — `migrate` (opcional via env) → `collectstatic` → `gunicorn`/`uvicorn`. **Invocar via `sh`** (não depender de bit +x).
@@ -144,7 +152,7 @@ ssh -L <porta>:localhost:<porta> root@<ip-do-droplet>
 ## 11. Checklist final (Definition of Done)
 
 - [ ] Database + role dedicados criados; conexão testada.
-- [ ] Imagem builda; container **healthy**; HTTP 200.
+- [ ] App sobe no runtime escolhido (container **healthy** se Docker; serviço `systemd` ativo se App Platform/venv); HTTP 200.
 - [ ] Dados migrados e **contagens validadas**.
 - [ ] Segredos no cofre; nenhum segredo no git.
 - [ ] ADR + runbook + README + dicionário de dados atualizados.
@@ -158,6 +166,7 @@ ssh -L <porta>:localhost:<porta> root@<ip-do-droplet>
 - **Recon antes de decidir** — a documentação não é a realidade; valide o ambiente real primeiro.
 - **1 database + 1 role por sistema** — isolamento e privilégio mínimo.
 - **Segredos nunca no git** — sempre no cofre (Bitwarden), nunca em chat/log/commit.
-- **Docker padroniza todos** — mesma forma de buildar, rodar e servir em qualquer sistema.
+- **Runtime é escolha consciente** — Docker quando a portabilidade compensa; App Platform/systemd
+  para o Sistema FNP e o worker do RAG. Decida no recon e registre no ADR.
 - **Valide por túnel antes de publicar** — revise via SSH antes de expor à internet.
 - **Documente os três eixos** — decisão (ADR) + execução (runbook) + schema (dicionário gerado).
