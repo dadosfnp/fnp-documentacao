@@ -1,6 +1,17 @@
 -- =============================================================
--- FNP Knowledge Base — Setup completo do banco PostgreSQL
--- Executar como doadmin no banco DO
+-- FNP Knowledge Base — Setup do banco do RAG (database `fnp_rag`)
+-- Executar como doadmin, CONECTADO ao database fnp_rag.
+--
+-- Modelo (RDA-002): cada app tem seu próprio database (fnp_sistema, ifem,
+-- nucleo_dados, ...). O RAG tem o SEU — `fnp_rag` — e é o HUB de leitura:
+-- guarda localmente os embeddings (pgvector) + o catálogo, e lê os outros
+-- bancos via postgres_fdw (read-only, sem copiar dado). Ver seção 7.
+--
+-- Criar o database uma vez (como doadmin, no defaultdb):
+--   CREATE ROLE fnp_rag_app LOGIN PASSWORD '<senha-forte-gerada-no-servidor>';
+--   CREATE DATABASE fnp_rag OWNER fnp_rag_app;
+--   REVOKE ALL ON DATABASE fnp_rag FROM PUBLIC;
+-- Depois conectar em fnp_rag e rodar este script.
 -- =============================================================
 
 -- -------------------------------------------------------------
@@ -9,29 +20,23 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS postgres_fdw;   -- para ler os outros bancos (seção 7)
 
 -- -------------------------------------------------------------
 -- 2. SCHEMAS
 -- -------------------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS rag;
-CREATE SCHEMA IF NOT EXISTS app;
-CREATE SCHEMA IF NOT EXISTS admin;
-
--- Schemas do Núcleo de Dados (dados tabulares consultáveis via SQL).
--- Regra canônica (RDA-002): dado tabular vive como SCHEMA no banco do RAG,
--- não como database separado — assim o assistente cruza rag + dados na mesma
--- query, sem postgres_fdw. Um schema por tema mantém a base navegável.
--- Adicione novos temas aqui conforme o Núcleo entregar datasets.
-CREATE SCHEMA IF NOT EXISTS economia;
-CREATE SCHEMA IF NOT EXISTS social;
-CREATE SCHEMA IF NOT EXISTS eleitoral;
+-- Só o que é do RAG vive aqui. Dados de apps e do Núcleo NÃO ficam neste
+-- banco — são lidos por FDW (seção 7). Por isso não há schema `app` nem
+-- schemas temáticos do Núcleo aqui.
+CREATE SCHEMA IF NOT EXISTS rag;     -- embeddings, catálogo, histórico
+CREATE SCHEMA IF NOT EXISTS admin;   -- usuários do chat, audit log
 
 -- Bloquear acesso público ao schema public
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 
 -- -------------------------------------------------------------
--- 3. ROLES
+-- 3. ROLES (todos LOGIN, privilégio mínimo)
 -- -------------------------------------------------------------
 
 -- Admin (só Pedro)
@@ -42,7 +47,7 @@ BEGIN
   END IF;
 END $$;
 
--- Django API — lê e escreve em rag e app
+-- Django API do RAG — lê/escreve em rag e admin; lê as foreign tables (FDW)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_write') THEN
@@ -58,17 +63,7 @@ BEGIN
   END IF;
 END $$;
 
--- Carga do Núcleo de Dados — escreve só nos schemas temáticos do Núcleo.
--- Usado pela TIC ao carregar os datasets do Núcleo (Parquet validado → tabela).
--- Privilégio mínimo: nunca toca em rag, app nem admin.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'nucleo_carga') THEN
-    CREATE ROLE nucleo_carga WITH LOGIN PASSWORD 'SUBSTITUIR_SENHA_FORTE';
-  END IF;
-END $$;
-
--- Colegas / analistas — só leitura
+-- Analistas — só leitura (rag + foreign tables)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'readonly') THEN
@@ -86,20 +81,20 @@ END $$;
 GRANT readonly TO fnp_readers;
 -- Para adicionar um colega: GRANT fnp_readers TO nome_do_usuario;
 
+-- Nota: a carga dos datasets do Núcleo NÃO acontece aqui. O role nucleo_carga
+-- e a tabela vivem no database `nucleo_dados` (ver TIC/playbook-ingestao-dados.md).
+
 -- -------------------------------------------------------------
 -- 4. PERMISSÕES POR SCHEMA
 -- -------------------------------------------------------------
 
--- app_write: rag + app
-GRANT USAGE ON SCHEMA rag TO app_write;
-GRANT USAGE ON SCHEMA app TO app_write;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA rag TO app_write;
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA app TO app_write;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rag TO app_write;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app TO app_write;
+-- app_write: rag + admin
+GRANT USAGE ON SCHEMA rag, admin TO app_write;
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA rag, admin TO app_write;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rag, admin TO app_write;
 ALTER DEFAULT PRIVILEGES IN SCHEMA rag
   GRANT SELECT, INSERT, UPDATE ON TABLES TO app_write;
-ALTER DEFAULT PRIVILEGES IN SCHEMA app
+ALTER DEFAULT PRIVILEGES IN SCHEMA admin
   GRANT SELECT, INSERT, UPDATE ON TABLES TO app_write;
 
 -- ingestor: só rag
@@ -109,36 +104,11 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA rag TO ingestor;
 ALTER DEFAULT PRIVILEGES IN SCHEMA rag
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ingestor;
 
--- readonly: leitura em rag e app
+-- readonly: leitura em rag
 GRANT USAGE ON SCHEMA rag TO readonly;
-GRANT USAGE ON SCHEMA app TO readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA rag TO readonly;
-GRANT SELECT ON ALL TABLES IN SCHEMA app TO readonly;
 ALTER DEFAULT PRIVILEGES IN SCHEMA rag
   GRANT SELECT ON TABLES TO readonly;
-ALTER DEFAULT PRIVILEGES IN SCHEMA app
-  GRANT SELECT ON TABLES TO readonly;
-
--- Schemas do Núcleo de Dados (economia, social, eleitoral):
---   nucleo_carga → escreve (carga dos datasets)
---   app_write    → lê (o text-to-SQL do assistente roda com esta credencial)
---   readonly     → lê (analistas consultam direto via DBeaver/psql)
--- O loop aplica a mesma política a cada schema temático; ao criar um schema
--- novo do Núcleo, basta acrescentá-lo na lista do array.
-DO $$
-DECLARE
-  schema_nucleo TEXT;
-BEGIN
-  FOREACH schema_nucleo IN ARRAY ARRAY['economia', 'social', 'eleitoral']
-  LOOP
-    EXECUTE format('GRANT USAGE ON SCHEMA %I TO nucleo_carga, app_write, readonly', schema_nucleo);
-    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I TO nucleo_carga', schema_nucleo);
-    EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO app_write, readonly', schema_nucleo);
-    EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO nucleo_carga', schema_nucleo);
-    -- Tabelas futuras carregadas pelo nucleo_carga herdam as permissões de leitura.
-    EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE nucleo_carga IN SCHEMA %I GRANT SELECT ON TABLES TO app_write, readonly', schema_nucleo);
-  END LOOP;
-END $$;
 
 -- -------------------------------------------------------------
 -- 5. TABELAS — SCHEMA RAG
@@ -185,6 +155,19 @@ CREATE TABLE IF NOT EXISTS rag.arquivos_indexados (
     status           TEXT        NOT NULL DEFAULT 'ok'
 );
 
+-- Catálogo: o "mapa" do que existe nas fontes (datasets do Núcleo, tabelas dos
+-- apps) que o roteador consulta para montar o text-to-SQL. Alimentado pelos
+-- dicionários (.yaml) — ver template-dicionario-dataset.yaml.
+CREATE TABLE IF NOT EXISTS rag.catalogo_fontes (
+    id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fonte         TEXT        NOT NULL,        -- ex.: nucleo_dados, fnp_sistema
+    schema_tabela TEXT        NOT NULL,        -- ex.: economia.pib_municipal
+    descricao     TEXT,
+    dicionario    JSONB       NOT NULL DEFAULT '{}',  -- colunas, grão, chave, tags
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (fonte, schema_tabela)
+);
+
 -- Histórico de perguntas
 CREATE TABLE IF NOT EXISTS rag.historico_perguntas (
     id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -224,12 +207,40 @@ CREATE TABLE IF NOT EXISTS admin.audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_criado_em ON admin.audit_log (criado_em DESC);
 
 -- -------------------------------------------------------------
--- 7. VERIFICAÇÃO FINAL
+-- 7. FEDERAÇÃO — ler os outros bancos via postgres_fdw (RDA-008)
 -- -------------------------------------------------------------
-SELECT
-    schemaname,
-    tablename,
-    tableowner
+-- O fnp_rag lê fnp_sistema, ifem e nucleo_dados como foreign tables READ-ONLY.
+-- Cada banco-fonte deve ter um role SÓ-LEITURA (ex.: <fonte>_ro); a senha dele
+-- entra no USER MAPPING (via .env, nunca hardcoded). Os bancos estão no mesmo
+-- cluster DO Managed, então o host é o mesmo (porta 25060, sslmode require).
+--
+-- Repita o bloco abaixo para cada fonte. Exemplo com nucleo_dados:
+--
+--   CREATE SERVER IF NOT EXISTS srv_nucleo_dados
+--     FOREIGN DATA WRAPPER postgres_fdw
+--     OPTIONS (host 'SUBSTITUIR_HOST_DB', port '25060', dbname 'nucleo_dados', sslmode 'require');
+--
+--   CREATE USER MAPPING IF NOT EXISTS FOR app_write SERVER srv_nucleo_dados
+--     OPTIONS (user 'nucleo_ro', password 'SUBSTITUIR_SENHA_RO');
+--   CREATE USER MAPPING IF NOT EXISTS FOR readonly  SERVER srv_nucleo_dados
+--     OPTIONS (user 'nucleo_ro', password 'SUBSTITUIR_SENHA_RO');
+--
+--   -- foreign tables ficam num schema espelho, fora do rag/admin:
+--   CREATE SCHEMA IF NOT EXISTS ext_nucleo;
+--   IMPORT FOREIGN SCHEMA economia FROM SERVER srv_nucleo_dados INTO ext_nucleo;
+--   GRANT USAGE ON SCHEMA ext_nucleo TO app_write, readonly;
+--   GRANT SELECT ON ALL TABLES IN SCHEMA ext_nucleo TO app_write, readonly;
+--
+-- Para fnp_sistema/ifem: idem, importando o schema `public` de cada um para
+-- ext_fnp_sistema / ext_ifem. Assim o text-to-SQL dá JOIN entre as fontes.
+
+-- -------------------------------------------------------------
+-- 8. VERIFICAÇÃO FINAL
+-- -------------------------------------------------------------
+SELECT schemaname, tablename, tableowner
 FROM pg_tables
-WHERE schemaname IN ('rag', 'app', 'admin', 'economia', 'social', 'eleitoral')
+WHERE schemaname IN ('rag', 'admin')
 ORDER BY schemaname, tablename;
+
+-- Servidores estrangeiros configurados (após rodar a seção 7):
+SELECT srvname, srvoptions FROM pg_foreign_server ORDER BY srvname;

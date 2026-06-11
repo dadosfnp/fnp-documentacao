@@ -17,8 +17,8 @@ dataset:
   periodicidade: "anual"                # anual | mensal | eventual
 
 localizacao:
-  banco: "banco único FNP"              # mesmo banco do rag (RDA-002)
-  schema: "economia"                    # schema do tema (não database separado)
+  database: "nucleo_dados"              # database próprio do Núcleo (RDA-002); RAG lê via FDW
+  schema: "economia"                    # schema do tema dentro do nucleo_dados
   tabela: "pib_municipal"               # schema.tabela = economia.pib_municipal
   arquivo_spaces: "dados/nucleo/pib_municipal/pib_municipal_2026-06-11.parquet"
   formato: "parquet"                    # parquet | excel

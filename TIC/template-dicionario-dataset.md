@@ -40,8 +40,8 @@ A FNP usa para comparar o porte econômico dos municípios filiados e embasar es
 |---|---|
 | Entregue no Drive | *ex.: `Planilhas e Dados/pib_municipal/`* (equipe) |
 | Arquivo arquivado (Spaces) | *ex.: `dados/nucleo/pib_municipal/pib_municipal_2026-06-11.parquet`* (TIC) |
-| Banco | Banco único da FNP (mesmo do `rag`) |
-| Schema.tabela | *ex.: `economia.pib_municipal`* (schema do Núcleo, não database separado) |
+| Database | `nucleo_dados` |
+| Schema.tabela | *ex.: `economia.pib_municipal`* (schema por tema dentro do `nucleo_dados`) |
 | Formato | Parquet / Excel |
 
 ---

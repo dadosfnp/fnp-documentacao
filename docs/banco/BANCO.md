@@ -1,27 +1,33 @@
 # Banco de Dados — FNP PostgreSQL (DigitalOcean)
 
-## Conexão
+> **Modelo (RDA-002):** 1 database por sistema no cluster DO Managed — `fnp_sistema` (CRM),
+> `ifem`, `nucleo_dados` e o **`fnp_rag`** (este doc). O `fnp_rag` é o **hub**: guarda os
+> embeddings e o catálogo, e lê os outros bancos por `postgres_fdw` (read-only, RDA-008).
+
+## Conexão (database `fnp_rag`)
 
 | Campo | Valor |
 |-------|-------|
 | Host | `db-xxx.db.ondigitalocean.com` *(atualizar)* |
 | Porta | `25060` |
-| Banco | `defaultdb` |
+| Banco | `fnp_rag` |
 | SSL | obrigatório (`sslmode=require`) |
 
 ---
 
-## Roles (usuários do banco)
+## Roles (usuários do banco `fnp_rag`)
 
 | Role | Acesso | Usado por |
 |------|--------|-----------|
 | `dba_admin` | tudo | Pedro (admin) |
-| `app_write` | escrita em `rag`/`app`; **leitura** nos schemas do Núcleo | Django API (inclui o text-to-SQL) |
+| `app_write` | escrita em `rag`/`admin`; **leitura** nas foreign tables (FDW) | Django API (inclui o text-to-SQL) |
 | `ingestor` | leitura + escrita só em `rag` | Worker Python |
-| `nucleo_carga` | escrita só nos schemas do Núcleo (`economia`, `social`...) | TIC, ao carregar datasets |
-| `readonly` | leitura em `rag`, `app` e schemas do Núcleo | Analistas / colegas |
+| `readonly` | leitura em `rag` e nas foreign tables | Analistas / colegas |
 
 **Regra:** nenhum role externo acessa o schema `admin`.
+**Carga do Núcleo:** o role `nucleo_carga` **não vive aqui** — ele pertence ao database
+`nucleo_dados` (ver [`playbook-ingestao-dados.md`](../../TIC/playbook-ingestao-dados.md)). O `fnp_rag`
+só **lê** o `nucleo_dados` via FDW, com um role só-leitura (`nucleo_ro`).
 
 ---
 
@@ -75,27 +81,34 @@
 | `latencia_ms` | int | tempo de resposta |
 | `criado_em` | timestamptz | quando foi feita |
 
+**`rag.catalogo_fontes`** — o "mapa" das fontes que o roteador usa para o text-to-SQL
+(qual dataset/tabela existe, em que banco, com que colunas/grão/chave). Alimentado pelos
+dicionários `.yaml` (ver [`template-dicionario-dataset.yaml`](../../TIC/template-dicionario-dataset.yaml)).
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | uuid | chave primária |
+| `fonte` | text | banco de origem (ex.: `nucleo_dados`, `fnp_sistema`) |
+| `schema_tabela` | text | ex.: `economia.pib_municipal` |
+| `descricao` | text | o que o dataset responde |
+| `dicionario` | jsonb | colunas, grão, chave, tags (do `.yaml`) |
+| `atualizado_em` | timestamptz | última sincronização do catálogo |
+
 ---
 
-### `app` — Dados do Sistema FNP
+### Foreign tables (FDW) — `ext_fnp_sistema`, `ext_ifem`, `ext_nucleo`
 
-Tabelas do sistema operacional da FNP (municípios, prefeitos, eventos etc.).
-Ver documentação específica em `docs/sistemas/`.
+Os dados que vivem em **outros bancos** (CRM em `fnp_sistema`, IFEM em `ifem`, indicadores em
+`nucleo_dados`) **não são copiados** para o `fnp_rag`. Eles entram como **foreign tables** via
+`postgres_fdw` (RDA-008), em schemas espelho `ext_*`, **só-leitura**:
 
----
-
-### Schemas do Núcleo de Dados — `economia`, `social`, `eleitoral`…
-
-Dados tabulares tratados no R (PIB, indicadores, séries) que a equipe quer **consultar/cruzar**.
-Vivem como **schemas no mesmo banco** (não em database separado — RDA-002), um por tema, com
-**uma tabela por dataset** em `snake_case` PT-BR (ex.: `economia.pib_municipal`).
-
-- **Quem alimenta:** a TIC, com o role `nucleo_carga`, seguindo o
-  [`playbook-ingestao-dados.md`](../../TIC/playbook-ingestao-dados.md).
-- **Quem lê:** o assistente (via text-to-SQL, RDA-006) e os analistas (`readonly`).
-- **Sem dicionário, não carrega:** cada dataset entra acompanhado do seu dicionário
-  (ver [`template-dicionario-dataset.md`](../../TIC/template-dicionario-dataset.md) e a versão `.yaml`),
-  que é o que o roteador usa para gerar a query certa.
+- O text-to-SQL do assistente roda no `fnp_rag` e dá `JOIN` entre as `ext_*` como se fossem locais.
+- Cada banco-fonte expõe um role só-leitura (`<fonte>_ro`) usado no *user mapping* do FDW.
+- Os dados do Núcleo são carregados no database `nucleo_dados` pela TIC (role `nucleo_carga`),
+  seguindo o [`playbook-ingestao-dados.md`](../../TIC/playbook-ingestao-dados.md); o `fnp_rag` só lê.
+- **Sem dicionário, o roteador não enxerga:** cada dataset entra com seu dicionário
+  ([`.md`](../../TIC/template-dicionario-dataset.md) + [`.yaml`](../../TIC/template-dicionario-dataset.yaml)),
+  registrado em `rag.catalogo_fontes`.
 
 ---
 

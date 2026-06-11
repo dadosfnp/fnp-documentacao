@@ -27,8 +27,9 @@ Antes de escrever qualquer coisa, levante (e anote num runbook):
 - **Rede:** o IP do droplet está na allowlist do banco? (testes de DB rodam do droplet, não da máquina local).
 - **Padrões reais já implantados** (não os documentados): como os outros sistemas rodam, autenticam, servem estáticos.
 
-> ⚠️ Aprendizado: o doc pode dizer "Docker + schemas" enquanto a realidade é "systemd+venv + 1 database por sistema".
-> Decida sempre a partir do que existe.
+> ⚠️ Aprendizado: a doc diverge da realidade nas duas direções — já achamos doc dizendo "App Platform"
+> quando a realidade era Droplet, e "schema por sistema" quando o real é 1 database por sistema.
+> **Valide o ambiente real antes de planejar** (este reconhecimento corrigiu a arquitetura do RAG).
 
 ---
 
@@ -62,17 +63,13 @@ ALTER SCHEMA public OWNER TO <sys>_app;   -- garante que o migrate consiga criar
 
 ---
 
-## 4. Runtime — Docker **ou** App Platform/systemd (escolha consciente)
+## 4. Containerização — Docker é o padrão (no Droplet `fnp-web`)
 
-> ⚠️ **Não há "Docker para todos".** Dois runtimes convivem na FNP, e a escolha é por sistema:
-> - **App Platform / systemd + venv** — é o caso do **Sistema FNP** (deploy gerenciado no DO App
->   Platform; ver [`SISTEMA_FNP.md`](../docs/sistemas/SISTEMA_FNP.md), "nunca usar Docker") e do
->   **worker de ingestão do RAG** (Droplet com `systemd` + cron, sem container).
-> - **Docker** — para sistemas novos onde a portabilidade de imagem compensa.
->
-> Decida no pré-flight (seção 1) e registre no ADR. O resto desta seção vale **se** você escolheu Docker.
+> **Padrão da infra: Docker** (Compose + Nginx reverse-proxy no Droplet `fnp-web`). O IFEM foi o
+> piloto e já roda assim; sistemas novos nascem em Docker. O **Sistema FNP** ainda roda em
+> systemd+venv (legado, anterior à padronização) e deve migrar — é a **exceção atual**, não o modelo.
 
-Cada sistema **Dockerizado** entrega, no próprio repo:
+Cada sistema entrega, no próprio repo:
 
 - **`Dockerfile`** — base slim, **usuário não-root**, deps via `requirements.txt` (cache de layer), `EXPOSE` da porta interna.
 - **`entrypoint.sh`** — `migrate` (opcional via env) → `collectstatic` → `gunicorn`/`uvicorn`. **Invocar via `sh`** (não depender de bit +x).
@@ -152,7 +149,7 @@ ssh -L <porta>:localhost:<porta> root@<ip-do-droplet>
 ## 11. Checklist final (Definition of Done)
 
 - [ ] Database + role dedicados criados; conexão testada.
-- [ ] App sobe no runtime escolhido (container **healthy** se Docker; serviço `systemd` ativo se App Platform/venv); HTTP 200.
+- [ ] App sobe em Docker (container **healthy**) no `fnp-web`; HTTP 200 via Nginx. (FNP legado: serviço `systemd` ativo.)
 - [ ] Dados migrados e **contagens validadas**.
 - [ ] Segredos no cofre; nenhum segredo no git.
 - [ ] ADR + runbook + README + dicionário de dados atualizados.
@@ -166,7 +163,6 @@ ssh -L <porta>:localhost:<porta> root@<ip-do-droplet>
 - **Recon antes de decidir** — a documentação não é a realidade; valide o ambiente real primeiro.
 - **1 database + 1 role por sistema** — isolamento e privilégio mínimo.
 - **Segredos nunca no git** — sempre no cofre (Bitwarden), nunca em chat/log/commit.
-- **Runtime é escolha consciente** — Docker quando a portabilidade compensa; App Platform/systemd
-  para o Sistema FNP e o worker do RAG. Decida no recon e registre no ADR.
+- **Docker é o padrão** — Compose + Nginx no Droplet `fnp-web`; IFEM piloto. FNP legado em systemd, a migrar.
 - **Valide por túnel antes de publicar** — revise via SSH antes de expor à internet.
 - **Documente os três eixos** — decisão (ADR) + execução (runbook) + schema (dicionário gerado).

@@ -15,37 +15,31 @@ Os arquivos originais **não são movidos**. O sistema cria um índice de busca 
 ## Componentes no DigitalOcean
 
 ```
-DigitalOcean (VPC privada)
+DigitalOcean
 │
-├── App Platform
-│   └── Django API (HTTPS :443)
-│       ├── endpoint /api/perguntar/
-│       └── interface de chat (React)
-│
-├── Droplet worker (sem IP público)
-│   └── ingestor.py
-│       ├── lê Google Drive via API
-│       ├── lê DO Spaces
-│       └── escreve embeddings no banco
+├── Droplet «fnp-web» (Ubuntu) — IP público, Nginx (TLS), atrás de Cloudflare
+│   ├── Containers Docker (padrão da infra; Compose + Nginx reverse-proxy)
+│   │   ├── RAG — Django API (:8002)   ← /api/perguntar/ + chat (React)
+│   │   ├── Sistema FNP (:8001) *      (* hoje systemd+venv, migrando p/ Docker)
+│   │   └── IFEM (:8003)
+│   └── Worker de ingestão (cron diário) — ingestor.py
+│         ├── lê Google Drive / DO Spaces
+│         └── escreve embeddings no banco fnp_rag
 │
 ├── DO Spaces (privado)
-│   └── fnp-knowledge-base/
-│       ├── documentos/
-│       ├── sistemas/    ← CLAUDE.md de cada sistema
-│       └── dados/       ← Parquet, XLS pesados
+│   └── fnp-knowledge-base/  (documentos/, sistemas/, dados/)
 │
-└── PostgreSQL gerenciado (banco único)
-    ├── schema: rag                    ← embeddings, histórico, catálogo
-    ├── schema: app                    ← dados FNP (municípios etc.)
-    ├── schema: admin                  ← usuários, audit log
-    └── schemas do Núcleo de Dados     ← dados tabulares consultáveis via SQL
-        ├── economia                   ← ex.: economia.pib_municipal
-        ├── social
-        └── eleitoral
+└── PostgreSQL Managed (DO) — 1 database por sistema
+    ├── fnp_rag       ← RAG: schema rag (embeddings/catálogo) + admin
+    ├── fnp_sistema   ← Sistema FNP (CRM)
+    ├── ifem          ← IFEM
+    └── nucleo_dados  ← dados tabulares do Núcleo (economia, social…)
+            ▲
+            └── fnp_rag lê os outros via postgres_fdw (read-only) — ver RDA-002/RDA-008
 ```
 
-> Os schemas do Núcleo ficam **no mesmo banco** do `rag` (RDA-002) — assim o assistente
-> cruza documento + dado na mesma query, sem `postgres_fdw`.
+> O `fnp_rag` é o **hub de leitura**: guarda local os embeddings e o catálogo (rápido) e
+> alcança os dados dos outros bancos por `postgres_fdw`, sem copiar nada.
 
 ---
 
@@ -80,9 +74,9 @@ Atualiza rag.arquivos_indexados (hash + timestamp)
 ```
 
 > **Por que cron + polling e não webhook do Drive:** o webhook do Google exige um endpoint
-> HTTPS público e renova o canal a cada 7 dias — incompatível com o worker sem IP público
-> (RDA-003). O cron diário lista o Drive e compara o SHA-256 contra o catálogo. Mais simples
-> e suficiente para o volume da FNP.
+> HTTPS público dedicado e renova o canal a cada 7 dias — complexidade desnecessária (RDA-003).
+> O cron diário lista o Drive e compara o SHA-256 contra o catálogo. Mais simples e suficiente
+> para o volume da FNP.
 
 ---
 
@@ -115,7 +109,7 @@ ROTEADOR: a pergunta é sobre documento ou sobre dado?  (ver RDA-006)
         Seleciona o(s) dataset(s) pelo catálogo/dicionário (tabela, colunas, grão)
             │
             ▼
-        Claude gera SQL (text-to-SQL), roda nos schemas do Núcleo (readonly)
+        Claude gera SQL (text-to-SQL), roda no fnp_rag via foreign tables (postgres_fdw, read-only)
             │
             ▼
         Monta prompt: system + resultado da query + pergunta
@@ -138,27 +132,28 @@ Retorna { resposta, fontes, tokens }
 **Decisão:** não mover arquivos do Drive para o banco. O banco guarda só texto extraído e embeddings.
 **Motivo:** Drive já tem versionamento, colaboração e permissões. Duplicar seria trabalho sem ganho.
 
-### RDA-002 — Um banco PostgreSQL único com schemas separados
-**Decisão:** schemas `rag`, `app`, `admin` **e os schemas do Núcleo de Dados** (`economia`,
-`social`, `eleitoral`...) no mesmo banco DO. Isolamento via roles do PostgreSQL.
-**Motivo:** simplifica operação, backup e custo — e, principalmente, permite ao assistente
-**cruzar documento + dado na mesma query** (`rag` × Núcleo) sem `postgres_fdw`.
+### RDA-002 — Cada sistema tem seu database; o RAG é o hub de leitura
+**Decisão:** seguir o padrão real da infra — **1 database por sistema** no mesmo cluster DO Managed
+(`fnp_sistema`, `ifem`, `nucleo_dados`, ...). O RAG tem o **seu próprio database `fnp_rag`**, com
+schemas `rag` (embeddings + catálogo) e `admin`. Ele **não guarda** dado de app nem do Núcleo —
+lê esses bancos por `postgres_fdw` (ver RDA-008).
+**Motivo:** isola backup, carga e risco de cada fonte; não duplica dado (e não cria cópia de PII);
+e mantém o `pgvector`/embeddings locais ao RAG, que é onde a busca semântica precisa rodar.
 
-**Regra canônica (schema vs. database):**
-- **Dado tabular consultável** (datasets do Núcleo) → **schema** no banco do RAG.
-- **Sistema com ORM próprio** (ex.: IFEM) → **database** dedicado (1 sistema = 1 database, ver
-  [`playbook-deploy-novo-sistema.md`](../../TIC/playbook-deploy-novo-sistema.md)). É um app externo
-  com ciclo de vida próprio, não um dado que o assistente consulta diretamente.
+**Regra canônica:**
+- **App/sistema com ORM** (CRM, IFEM) ou **base de dados do Núcleo** → **database próprio**.
+- **O RAG** → database próprio (`fnp_rag`) que **lê os demais via FDW**, nunca por cópia.
 
-> Isto reconcilia a aparente contradição com o playbook de deploy: "1 sistema = 1 database" vale
-> para **apps**; dado tabular do Núcleo **não é um app**, é um schema aqui.
+> Reconcilia o playbook de deploy ("1 sistema = 1 database") com a necessidade do RAG cruzar tudo:
+> ele cruza por federação (FDW), não colocando todo mundo no mesmo banco.
 
-### RDA-003 — Worker sem IP público
-**Decisão:** Droplet do worker fica só na VPC interna, sem acesso externo.
-**Motivo:** o worker só precisa falar com o banco e o Spaces, ambos dentro da VPC.
-**Consequência:** a detecção de mudança é por **cron diário + polling** (lista o Drive/Spaces e
-compara hash), **não por webhook** — webhook do Google exige endpoint HTTPS público e renovação
-de canal a cada 7 dias, o que o worker sem IP não consegue oferecer.
+### RDA-003 — Worker de ingestão no Droplet, detecção por cron+polling
+**Decisão:** o `ingestor.py` roda no Droplet `fnp-web` (como container/cron), escrevendo no `fnp_rag`.
+A detecção de mudança é por **cron diário + polling** (lista Drive/Spaces e compara SHA-256), **não
+por webhook**.
+**Motivo:** webhook do Google exige endpoint HTTPS público dedicado e renova o canal a cada 7 dias —
+complexidade desnecessária para o volume da FNP. O cron é mais simples e suficiente. (O Droplet tem
+IP público para servir as apps via Nginx, mas o worker não precisa receber chamadas de fora.)
 
 ### RDA-004 — Reindexação por hash, não por data
 **Decisão:** só reindexar arquivo se o SHA-256 mudou.
@@ -191,6 +186,20 @@ e contratos entram como `restrito`; o default é `interno` (conservador).
 **Pendência conhecida:** a detecção de PII **no conteúdo** (não só pela pasta) ainda falta — está
 marcada como TODO no `ingestor.py` e deve ser resolvida antes de indexar material sensível.
 
+### RDA-008 — Cruzamento entre bancos por postgres_fdw (read-only)
+**Decisão:** o `fnp_rag` lê `fnp_sistema`, `ifem` e `nucleo_dados` por **`postgres_fdw`**, com
+foreign tables em schemas espelho (`ext_fnp_sistema`, `ext_ifem`, `ext_nucleo`). O acesso usa um
+role **só-leitura** em cada banco-fonte (`<fonte>_ro`); o text-to-SQL roda no `fnp_rag` e dá `JOIN`
+entre as fontes como se fossem locais.
+**Motivo:** os bancos estão no mesmo cluster DO Managed (mesmo host), então o FDW conecta sem rede
+extra; lê sempre o dado fresco, sem ETL nem cópia de PII. É a forma de o RAG "cruzar dados de todos"
+mantendo cada banco como dono do seu dado.
+**Alternativa considerada:** federar na camada Django (uma conexão por banco, junção em Python) —
+mais simples de configurar, mas cruzar duas fontes vira trabalho manual e mais lento. Fica como
+plano B se o FDW der atrito no Managed.
+**Dado público do Núcleo:** por ser público e só-leitura, pode opcionalmente ser **colocado** dentro
+do `fnp_rag` (cópia analítica) se a leitura via FDW se mostrar lenta — começar por FDW e medir.
+
 ---
 
 ## Variáveis de ambiente necessárias
@@ -201,12 +210,14 @@ Ver `.env.example` na raiz do repositório.
 
 ## Custo estimado mensal (referência)
 
+> ⚠️ Capacidade: o Droplet `fnp-web` e o cluster Postgres têm **previsão de upgrade** quando o RAG
+> entrar (o runbook já aponta swap 2G → RAM 4GB). Dimensionamento a estudar.
+
 | Componente | Custo |
 |------------|-------|
-| PostgreSQL DO (Basic) | ~$15/mês |
-| App Platform (Basic) | ~$12/mês |
-| Droplet worker (1GB) | ~$6/mês |
+| PostgreSQL Managed DO | ~$15/mês (a reavaliar no upgrade) |
+| Droplet `fnp-web` (compartilhado: FNP + RAG + IFEM) | ~$6–12/mês (a reavaliar no upgrade) |
 | DO Spaces (250GB) | ~$5/mês |
 | OpenAI Embeddings (indexação) | ~$2–5 (só na indexação inicial) |
 | Claude API (consultas) | ~$20–30/mês (estimativa 100 perguntas/dia) |
-| **Total estimado** | **~$60–75/mês** |
+| **Total estimado** | **~$50–65/mês** (antes do upgrade) |

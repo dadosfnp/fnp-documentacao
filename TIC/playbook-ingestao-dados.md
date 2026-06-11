@@ -15,7 +15,7 @@
 > indexados só para busca — **nunca** viram tabela no banco e **nada é movido ou removido do Drive**.
 > Aqui tratamos **exclusivamente de dados tabulares** (Parquet/planilhas de indicadores tratados no R)
 > que você quer **consultar**. Regra mental: **documento você quer _encontrar_** (fica no Drive, o RAG acha) —
-> **dado tabular você quer _consultar_** (vira tabela num **schema do Núcleo** no banco do RAG).
+> **dado tabular você quer _consultar_** (vira tabela no **database `nucleo_dados`**; o RAG lê via FDW).
 
 ---
 
@@ -25,12 +25,12 @@ A FNP tem **três camadas de dados**. Entender onde cada coisa vive é o que tor
 
 | Camada | O que é | Onde vive | Quem alimenta |
 |---|---|---|---|
-| **Núcleo de Dados** | Dados públicos tratados via R (hoje espalhados em Excel/Parquet) | **Schemas do Núcleo** (`economia`, `social`…) no banco do RAG | Equipe do Núcleo de Dados |
+| **Núcleo de Dados** | Dados públicos tratados via R (hoje espalhados em Excel/Parquet) | Database **`nucleo_dados`** (schemas `economia`, `social`…) | Equipe do Núcleo de Dados |
 | **Bases de aplicação** | Dados operacionais de cada sistema | `fnp` (CRM), `ifem`, próximos — **1 sistema = 1 database** | Cada app, via seu ORM |
 | **RAG (mapa/roteador)** | **Não armazena os dados** — indexa os `.md` e cataloga as fontes pra saber **onde** procurar | Schema `rag` (embeddings + catálogo) | Os `.md` deste repositório, do Drive e dos apps |
 
 > **Princípio central:** o RAG é um **índice de onde as coisas estão**, não um cofre de dados.
-> Quando alguém pergunta algo, o RAG localiza a fonte (um dataset num schema do Núcleo, uma tabela do `ifem`,
+> Quando alguém pergunta algo, o RAG localiza a fonte (um dataset no `nucleo_dados`, uma tabela do `ifem`,
 > um arquivo no Drive) e responde **citando de onde veio**. Por isso, todo dataset que entra **precisa**
 > de um dicionário — sem dicionário, o RAG não sabe que o dado existe.
 
@@ -42,7 +42,7 @@ Cada peça do dado mora no lugar onde ela é melhor servida:
 |---|---|---|
 | **Dicionário** (`.md`, leve, texto) | **Google Drive** (e versionado neste repo) | Familiar pra equipe; é o "mapa" que o RAG lê e indexa |
 | **Arquivo Parquet** (pesado, binário) | **DO Spaces** (`dados/nucleo/...`) | Storage S3, certo pra blob grande; é a fonte arquivada |
-| **Dado consultável** (tabela) | **Schema do Núcleo** no banco do RAG (ex.: `economia`) | É onde se faz query/BI de verdade |
+| **Dado consultável** (tabela) | Database **`nucleo_dados`** (ex.: `economia.pib_municipal`) | É onde se faz query/BI de verdade |
 
 > A **equipe só toca no Google Drive** (um lugar, familiar — segue os mesmos guias de [`docs/equipe/`](../docs/equipe/GUIA_ARQUIVOS.md)).
 > Quem faz a parte híbrida (arquivar o Parquet no Spaces e carregar a tabela no banco) é a **TIC**.
@@ -60,33 +60,37 @@ Cada peça do dado mora no lugar onde ela é melhor servida:
 
 ---
 
-## 2. Onde os dados ficam — schemas do Núcleo no banco do RAG
+## 2. Onde os dados ficam — database `nucleo_dados`
 
-> ⚠️ **Atenção (RDA-002):** dado tabular do Núcleo **não** é um database separado — é **schema no
-> banco único** do RAG. Isso permite ao assistente cruzar `rag` × dado na mesma query, sem
-> `postgres_fdw`. Database dedicado é só para **app com ORM próprio** (ex.: IFEM), pelo
-> [`playbook-deploy-novo-sistema.md`](playbook-deploy-novo-sistema.md). Regra: *dado consultável = schema; app = database*.
+> ⚠️ **Atenção (RDA-002):** o Núcleo de Dados é um **database próprio** (`nucleo_dados`), como todo
+> sistema da FNP. O **RAG não guarda esses dados** — ele lê o `nucleo_dados` por `postgres_fdw`
+> (read-only, RDA-008). Assim cada banco é dono do seu dado e o assistente cruza tudo por federação.
 
-Os schemas e o role de carga já são criados pelo
-[`01_setup_banco.sql`](../scripts/sql/01_setup_banco.sql). Para um **tema novo** (ainda não previsto),
-com a credencial admin (`doadmin`), no **banco do RAG**:
+Com a credencial admin (`doadmin`), criar **uma única vez** o database e o role de carga
+(mesma receita do [`playbook-deploy-novo-sistema.md`](playbook-deploy-novo-sistema.md) — 1 db + 1 role):
 
 ```sql
--- 1) schema do tema (só uma vez por tema)
-CREATE SCHEMA IF NOT EXISTS economia;
+-- como doadmin, no defaultdb:
+CREATE ROLE nucleo_carga LOGIN PASSWORD '<senha-forte-gerada-no-servidor>';
+CREATE DATABASE nucleo_dados OWNER nucleo_carga;
+REVOKE ALL ON DATABASE nucleo_dados FROM PUBLIC;
 
--- 2) permissões: carga escreve, assistente e analistas leem
-GRANT USAGE ON SCHEMA economia TO nucleo_carga, app_write, readonly;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA economia TO nucleo_carga;
-GRANT SELECT ON ALL TABLES IN SCHEMA economia TO app_write, readonly;
-ALTER DEFAULT PRIVILEGES FOR ROLE nucleo_carga IN SCHEMA economia
-  GRANT SELECT ON TABLES TO app_write, readonly;
+-- role só-leitura que o FDW do RAG vai usar:
+CREATE ROLE nucleo_ro LOGIN PASSWORD '<senha-forte-gerada-no-servidor>';
+
+-- conectando no database nucleo_dados:
+GRANT ALL ON SCHEMA public TO nucleo_carga;
+ALTER SCHEMA public OWNER TO nucleo_carga;
+CREATE SCHEMA IF NOT EXISTS economia AUTHORIZATION nucleo_carga;  -- um schema por tema
+GRANT USAGE ON SCHEMA economia TO nucleo_ro;
+ALTER DEFAULT PRIVILEGES FOR ROLE nucleo_carga IN SCHEMA economia GRANT SELECT ON TABLES TO nucleo_ro;
 ```
 
-- **Um schema por tema** (ex.: `economia`, `social`, `eleitoral`) — mantém a base navegável.
+- **Um schema por tema** (ex.: `economia`, `social`, `eleitoral`) dentro do `nucleo_dados`.
 - **Uma tabela por dataset.** Nome em PT-BR, `snake_case`, prefixado pelo tema: `economia.pib_municipal`.
-- A **carga** usa o role `nucleo_carga` (privilégio mínimo: escreve só nos schemas do Núcleo). A senha
-  é gerada **no servidor** (`openssl rand -hex 24`) e vive só no `.env` do droplet + cofre Bitwarden.
+- A senha do `nucleo_carga`/`nucleo_ro` é gerada **no servidor** (`openssl rand -hex 24`) e vive só no
+  `.env` do droplet + cofre Bitwarden.
+- O `fnp_rag` lê este banco via FDW usando o `nucleo_ro` (ver [`01_setup_banco.sql`](../scripts/sql/01_setup_banco.sql), seção 7).
 
 ---
 

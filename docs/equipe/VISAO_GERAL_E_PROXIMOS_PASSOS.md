@@ -29,10 +29,10 @@ flowchart TB
     DRIVE["☁️ GOOGLE DRIVE<br/>tudo continua aqui — nada é movido"]
     SPACES["🗄️ DO Spaces<br/>Parquet pesado arquivado"]
 
-    subgraph PG["🐘 PostgreSQL — DigitalOcean"]
-        RAGDB[("rag<br/>buscas + catálogo do que existe")]
-        NUCLEO[("schemas do Núcleo<br/>dados tabulares consultáveis")]
-        APP[("app · ifem<br/>dados dos sistemas")]
+    subgraph PG["🐘 PostgreSQL Managed — DigitalOcean (1 banco por sistema)"]
+        RAGDB[("fnp_rag<br/>buscas + catálogo do que existe")]
+        NUCLEO[("nucleo_dados<br/>dados tabulares consultáveis")]
+        APP[("fnp_sistema · ifem<br/>dados dos sistemas")]
     end
 
     WORKER["⚙️ Worker de ingestão<br/>lê, extrai texto, gera embeddings"]
@@ -50,7 +50,8 @@ flowchart TB
     USER --> ASSIST
     ASSIST -->|busca| RAGDB
     ASSIST -. aponta p/ o arquivo .-> DRIVE
-    ASSIST -. consulta o dado .-> NUCLEO
+    ASSIST -. lê via FDW .-> NUCLEO
+    ASSIST -. lê via FDW .-> APP
 ```
 
 <details>
@@ -67,13 +68,13 @@ flowchart TB
                │              │
                ▼              ▼
          ┌──────────────────────────────────────┐
-         │     PostgreSQL (DigitalOcean)         │
-         │   • rag          → buscas + catálogo  │
-         │   • Núcleo (schemas) → tabelas consultáveis│
-         │   • app / ifem   → sistemas           │
+         │  PostgreSQL DO — 1 banco por sistema  │
+         │   • fnp_rag       → buscas + catálogo │
+         │   • nucleo_dados  → tabelas do Núcleo │
+         │   • fnp_sistema/ifem → sistemas       │
          └──────────────────────────────────────┘
                           ▲
-                          │ busca
+                          │ busca local + lê os outros via FDW
               🤖 Assistente RAG  ◄──── 🙋 Equipe pergunta
                           │
                           └─► responde citando a fonte
