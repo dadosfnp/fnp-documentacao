@@ -98,6 +98,10 @@ dicionários `.yaml` (ver [`template-dicionario-dataset.yaml`](../../TIC/templat
 
 ### Foreign tables (FDW) — `ext_fnp_sistema`, `ext_ifem`, `ext_nucleo`
 
+> ✅ **O RAG não perde acesso a nada.** Tirar o schema `app` não tira acesso — só muda *como* ele
+> acessa: em vez de uma cópia local (o antigo `app`), ele lê o **banco real ao vivo** (read-only).
+> O que era `app.municipios` agora é `ext_fnp_sistema.municipios`. Acesso a tudo, dado fresco, sem cópia.
+
 Os dados que vivem em **outros bancos** (CRM em `fnp_sistema`, IFEM em `ifem`, indicadores em
 `nucleo_dados`) **não são copiados** para o `fnp_rag`. Eles entram como **foreign tables** via
 `postgres_fdw` (RDA-008), em schemas espelho `ext_*`, **só-leitura**:
